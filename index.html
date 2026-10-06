@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#7a1f2b">
+<title>Suivi Interventions Échecs</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%99%9F%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f6f5f2; --surface: #ffffff; --surface-2: #eef0f4;
+    --text: #1e2230; --text-muted: #6b7280; --border: #e2e4ea;
+    --accent: #7a1f2b; --accent-2: #1f4e79; --accent-3: #5b7a3a;
+    --accent-alex: #c98a3c; --accent-steph: #3c7bb0;
+    --done-bg: #e5f3ea; --done-border: #4c9a63;
+    --warn-bg: #fdf2e3; --warn-border: #d99a2b; --danger: #b3372c;
+    --radius: 12px;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161c; --surface: #1d2029; --surface-2: #252936;
+      --text: #eceef2; --text-muted: #9aa0ae; --border: #333747;
+      --done-bg: #16301f; --done-border: #3e8a56;
+      --warn-bg: #332a14; --warn-border: #b5852a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  #app { max-width: 780px; margin: 0 auto; padding: 12px 14px 60px; }
+  h1 { font-size: 1.25rem; margin: 4px 0 2px; }
+  h2 { font-size: 1.05rem; margin: 18px 0 8px; }
+  p { line-height: 1.45; }
+  .muted { color: var(--text-muted); font-size: 0.85rem; }
+
+  /* Connexion */
+  .login-wrap { min-height: 90vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .login-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 28px 24px; width: 100%; max-width: 340px; text-align: center;
+  }
+  .login-card .icon { font-size: 2.4rem; margin-bottom: 6px; }
+  .login-card select, .login-card input {
+    width: 100%; padding: 11px 12px; margin-top: 12px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 1rem; background: var(--surface-2); color: var(--text);
+  }
+  .login-card button {
+    width: 100%; margin-top: 16px; padding: 12px; border: none; border-radius: 8px;
+    background: var(--accent); color: white; font-size: 1rem; font-weight: 600; cursor: pointer;
+  }
+  .login-error { color: var(--danger); font-size: 0.85rem; margin-top: 10px; min-height: 1em; }
+
+  /* En-tête et onglets */
+  header.topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 0 10px; border-bottom: 1px solid var(--border); margin-bottom: 10px;
+  }
+  .badge-user { font-size: 0.75rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; color: white; }
+  .badge-user.Alexandre { background: var(--accent-alex); }
+  .badge-user.Stephane { background: var(--accent-steph); }
+  button.link { background: none; border: none; color: var(--accent-2); font-size: 0.85rem; cursor: pointer; padding: 4px 0; text-decoration: underline; }
+  nav.tabs { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; }
+  nav.tabs button {
+    flex: 1; padding: 9px 6px; font-size: 0.82rem; font-weight: 600; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-muted); border-radius: 8px; cursor: pointer; white-space: nowrap;
+  }
+  nav.tabs button.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .toolbar select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 0.9rem; }
+  .toolbar > button, button.btn {
+    padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text); font-size: 0.85rem; cursor: pointer;
+  }
+  .toggle-group { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .toggle-group button { padding: 7px 12px; font-size: 0.82rem; border: none; background: var(--surface); color: var(--text-muted); cursor: pointer; }
+  .toggle-group button.active { background: var(--surface-2); color: var(--text); font-weight: 700; }
+
+  /* Séances */
+  .day-title { font-size: 0.8rem; font-weight: 700; text-transform: capitalize; color: var(--text-muted); margin: 14px 0 6px; padding-left: 2px; }
+  .session-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 8px; }
+  .session-card.done { background: var(--done-bg); border-color: var(--done-border); }
+  .session-card.reported { border-left: 4px solid var(--warn-border); }
+  .session-top { display: flex; align-items: flex-start; gap: 10px; }
+  .session-check { width: 26px; height: 26px; flex-shrink: 0; margin-top: 1px; cursor: pointer; }
+  .session-info { flex: 1; min-width: 0; }
+  .session-info .time { font-weight: 700; font-size: 0.95rem; }
+  .session-info .school { font-weight: 700; }
+  .session-info .classe { color: var(--text-muted); font-size: 0.9rem; }
+  .session-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
+  .pill { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; color: white; }
+  .pill.week-A { background: var(--accent); }
+  .pill.week-B { background: var(--accent-2); }
+  .pill.week-C { background: var(--accent-3); }
+  .pill.intervenant.Alexandre { background: var(--accent-alex); }
+  .pill.intervenant.Stephane { background: var(--accent-steph); }
+  .pill.count { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+  .reported-note { margin-top: 6px; font-size: 0.78rem; background: var(--warn-bg); border: 1px solid var(--warn-border); padding: 4px 8px; border-radius: 6px; display: inline-block; }
+  .holiday-note { margin: 6px 0; font-size: 0.78rem; background: var(--surface-2); border: 1px solid var(--danger); color: var(--danger); font-weight: 600; padding: 4px 8px; border-radius: 6px; display: inline-block; }
+  .session-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .session-actions button { font-size: 0.78rem; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer; }
+  .session-actions button.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+  .inline-panel { margin-top: 8px; padding: 8px; background: var(--surface-2); border-radius: 8px; }
+  .inline-panel input[type=date] { padding: 7px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; background: var(--surface); color: var(--text); }
+  .inline-panel textarea { width: 100%; min-height: 70px; padding: 8px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.9rem; font-family: inherit; resize: vertical; background: var(--surface); color: var(--text); }
+  .inline-panel .row { display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+  .note-preview { font-size: 0.8rem; margin-top: 6px; background: var(--surface-2); padding: 6px 8px; border-radius: 6px; white-space: pre-wrap; }
+
+  /* Statistiques */
+  table.stats { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 8px; }
+  table.stats th, table.stats td { padding: 7px 6px; border-bottom: 1px solid var(--border); text-align: left; }
+  table.stats th { color: var(--text-muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+  table.stats td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.total-row td { font-weight: 700; border-top: 2px solid var(--border); }
+  .school-title { font-weight: 700; margin: 16px 0 4px; font-size: 0.9rem; }
+  .class-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+  .class-row .name { flex: 1; min-width: 0; }
+  .class-row .bar { width: 90px; height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; flex-shrink: 0; }
+  .class-row .bar > span { display: block; height: 100%; background: var(--done-border); }
+  .class-row .frac { width: 48px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; flex-shrink: 0; }
+
+  .box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
+  .box .btn { margin: 4px 6px 4px 0; }
+  .msg { margin-top: 8px; font-size: 0.85rem; }
+  .empty-state { text-align: center; color: var(--text-muted); padding: 30px 10px; font-size: 0.9rem; }
+  .sync-status { font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 22px; }
+  .sync-status.err { color: var(--danger); font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="app"><div class="empty-state">Chargement…</div></div>
+<noscript>Cette application nécessite JavaScript.</noscript>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
+         collection, doc, setDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+/* =====================================================================
+   1) CONFIGURATION FIREBASE — à remplacer par la vôtre (voir GUIDE)
+   ===================================================================== */
+const firebaseConfig = const firebaseConfig = {
+  apiKey: "AIzaSyBJ41SntBxOJjzlAL_e_t96KrV4BAZE_vU",
+  authDomain: "suivi-echecs-f11ec.firebaseapp.com",
+  projectId: "suivi-echecs-f11ec",
+  storageBucket: "suivi-echecs-f11ec.firebasestorage.app",
+  messagingSenderId: "346230062237",
+  appId: "1:346230062237:web:83652601d323f3acafe874"
+};
+
+// Adresses techniques des deux comptes (créés dans la console Firebase).
+// Aucun mail n'est envoyé à ces adresses : elles servent seulement d'identifiant.
+const EMAIL_DOMAIN = "example.com";
+const USERS = {
+  alexandre: { key: "Alexandre", label: "Alexandre" },
+  stephane:  { key: "Stephane",  label: "Stéphane" }
+};
+
+/* =====================================================================
+   2) OUTILS
+   ===================================================================== */
+const app = document.getElementById("app");
+const DAY_OFFSET = { "Lundi": 0, "Mardi": 1, "Mercredi": 2, "Jeudi": 3, "Vendredi": 4, "Samedi": 5 };
+const MOIS_FR = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+const JOURS_FR = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+
+function pad(n) { return ("0" + n).slice(-2); }
+function addDays(iso, n) {
+  const d = new Date(iso + "T00:00:00"); d.setDate(d.getDate() + n);
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+}
+function todayISO() { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+function formatDateLong(iso) { const d = new Date(iso + "T00:00:00"); return JOURS_FR[d.getDay()] + " " + d.getDate() + " " + MOIS_FR[d.getMonth()] + " " + d.getFullYear(); }
+function formatDateShort(iso) { const d = new Date(iso + "T00:00:00"); return d.getDate() + " " + MOIS_FR[d.getMonth()].slice(0, 3) + " " + d.getFullYear(); }
+function formatDateNum(iso) { const p = iso.split("-"); return p[2] + "/" + p[1] + "/" + p[0]; }
+function monthKey(iso) { return iso.slice(0, 7); }
+function monthLabel(key) { const p = key.split("-"); const m = MOIS_FR[parseInt(p[1], 10) - 1]; return m.charAt(0).toUpperCase() + m.slice(1) + " " + p[0]; }
+function slugify(s) { return String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase(); }
+function esc(str) { return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function intLabel(int) { return int === "Alexandre" ? "Alexandre" : "Stéphane"; }
+function cmpDateTime(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : a.time.localeCompare(b.time); }
+
+/* =====================================================================
+   3) ÉTAT
+   ===================================================================== */
+let auth = null, db = null;
+let authReady = false;
+let planning = null, planningLoaded = false;
+let SESSIONS = [];
+let overrides = {};
+let pendingWrites = false;
+let syncError = "";
+let CLASSSTATS = {};
+let unsubPlanning = null, unsubOverrides = null;
+
+const state = {
+  user: null,            // "Alexandre" | "Stephane"
+  tab: "avenir",
+  scopeMine: true,
+  selectedMonth: null,
+  openReport: null,
+  openNote: null,
+  loginError: "",
+  loginUser: "alexandre",
+  msg: ""
+};
+
+/* =====================================================================
+   4) GÉNÉRATION DES SÉANCES À PARTIR DU PLANNING
+   ===================================================================== */
+function buildSessions(p) {
+  const list = [];
+  function gen(mondays, tpl, week, cycleName) {
+    (mondays || []).forEach(monday => {
+      (tpl || []).forEach(slot => {
+        const off = DAY_OFFSET[slot.day];
+        if (off === undefined) return;
+        const date = addDays(monday, off);
+        const id = [slugify(slot.int), slugify(slot.day), slugify(slot.time), slugify(slot.school), slugify(slot.classe), date].join("-");
+        list.push({
+          id, int: slot.int, day: slot.day, time: slot.time, school: slot.school, classe: slot.classe,
+          week, cycle: cycleName || null, total: slot.total || null, originalDate: date
+        });
+      });
+    });
+  }
+  gen(p.lundisSemaineA, p.semaineA, "A");
+  gen(p.lundisSemaineB, p.semaineB, "B");
+  // Cycles (ex. Reclus) : N semaines d'école consécutives, hors vacances, sans alternance A/B
+  const schoolWeeks = (p.lundisSemaineA || []).concat(p.lundisSemaineB || []).sort();
+  (p.cycles || []).forEach(c => {
+    const weeks = schoolWeeks.filter(m => m >= c.premierLundi).slice(0, c.nombre);
+    gen(weeks, c.creneaux, "C", c.nom);
+  });
+  list.sort((a, b) => a.originalDate < b.originalDate ? -1 : a.originalDate > b.originalDate ? 1 : a.time.localeCompare(b.time));
+  return list;
+}
+function rebuildSessions() { SESSIONS = planning ? buildSessions(planning) : []; }
+function holidays() { return (planning && planning.feries) || {}; }
+function weekLabel(s) { return s.week === "C" ? "Cycle " + s.cycle : "Semaine " + s.week; }
+function weekClass(s) { return "week-" + s.week; }
+
+function effective(s) {
+  const ov = overrides[s.id] || {};
+  return { done: !!ov.done, note: ov.note || "", newDate: ov.newDate || null, date: ov.newDate || s.originalDate };
+}
+function classKey(s) { return s.int + "|" + s.school + "|" + s.classe; }
+function computeClassStats() {
+  const m = {};
+  SESSIONS.forEach(s => {
+    const k = classKey(s);
+    const o = m[k] || (m[k] = { int: s.int, school: s.school, classe: s.classe, done: 0, total: 0, fixed: null });
+    o.total++;
+    if (effective(s).done) o.done++;
+    if (s.total) o.fixed = s.total;
+  });
+  Object.keys(m).forEach(k => { m[k].shown = m[k].fixed || m[k].total; });
+  CLASSSTATS = m;
+}
+
+/* =====================================================================
+   5) FIREBASE
+   ===================================================================== */
+function configOk() { return firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("COLLER") === -1; }
+
+function initFirebase() {
+  const fbApp = initializeApp(firebaseConfig);
+  auth = getAuth(fbApp);
+  try {
+    db = initializeFirestore(fbApp, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+  } catch (e) {
+    db = getFirestore(fbApp);
+  }
+  onAuthStateChanged(auth, onAuth);
+}
+
+function stopListeners() {
+  if (unsubPlanning) { unsubPlanning(); unsubPlanning = null; }
+  if (unsubOverrides) { unsubOverrides(); unsubOverrides = null; }
+  planning = null; planningLoaded = false; overrides = {}; SESSIONS = []; syncError = "";
+}
+
+function startListeners() {
+  unsubPlanning = onSnapshot(doc(db, "config", "planning"), snap => {
+    planning = snap.exists() ? snap.data() : null;
+    planningLoaded = true;
+    rebuildSessions();
+    render();
+  }, err => { syncError = "Lecture du planning impossible (" + (err.code || err.message) + ")"; planningLoaded = true; render(); });
+
+  unsubOverrides = onSnapshot(collection(db, "overrides"), { includeMetadataChanges: true }, snap => {
+    const map = {};
+    snap.forEach(d => { map[d.id] = d.data(); });
+    overrides = map;
+    pendingWrites = snap.metadata.hasPendingWrites;
+    render();
+  }, err => { syncError = "Lecture des séances impossible (" + (err.code || err.message) + ")"; render(); });
+}
+
+function onAuth(fbUser) {
+  authReady = true;
+  stopListeners();
+  if (!fbUser) { state.user = null; render(); return; }
+  const id = (fbUser.email || "").split("@")[0].toLowerCase();
+  if (!USERS[id]) { state.user = null; state.loginError = "Compte non reconnu."; signOut(auth); render(); return; }
+  state.user = USERS[id].key;
+  startListeners();
+  render();
+}
+
+async function doLogin() {
+  const userSel = document.getElementById("login-user");
+  const pass = document.getElementById("login-pass").value;
+  state.loginUser = userSel.value;
+  try {
+    await signInWithEmailAndPassword(auth, state.loginUser + "@" + EMAIL_DOMAIN, pass);
+    state.loginError = "";
+  } catch (e) {
+    const code = e && e.code ? e.code : "";
+    if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found" || code === "auth/invalid-email")
+      state.loginError = "Identifiant ou mot de passe incorrect.";
+    else if (code === "auth/too-many-requests") state.loginError = "Trop de tentatives. Réessayez dans quelques minutes.";
+    else if (code === "auth/network-request-failed") state.loginError = "Pas de connexion internet.";
+    else state.loginError = "Connexion impossible (" + (code || "erreur") + ").";
+    render();
+  }
+}
+
+function saveOverride(id, patch) {
+  const data = Object.assign({}, patch, { updatedAt: Date.now(), updatedBy: state.user });
+  setDoc(doc(db, "overrides", id), data, { merge: true }).catch(e => {
+    alert("Enregistrement impossible (" + (e.code || e.message) + "). La modification n'a PAS été sauvegardée.");
+  });
+}
+
+/* =====================================================================
+   6) EXPORT / IMPORT
+   ===================================================================== */
+function downloadFile(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+function csvEscape(v) {
+  v = v === null || v === undefined ? "" : String(v);
+  return /[;"\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+}
+
+// Séances réalisées : pour un mois (mKey = "2026-10") ou pour toute l'année (mKey = null)
+function exportDoneCSV(mKey) {
+  const all = SESSIONS.map(s => ({ s, eff: effective(s) }));
+  // numéro de la séance dans la classe (ordre chronologique des séances faites)
+  const byClass = {};
+  all.filter(x => x.eff.done).forEach(x => { (byClass[classKey(x.s)] = byClass[classKey(x.s)] || []).push({ id: x.s.id, date: x.eff.date, time: x.s.time }); });
+  const rank = {};
+  Object.keys(byClass).forEach(k => { byClass[k].sort(cmpDateTime); byClass[k].forEach((x, i) => { rank[x.id] = i + 1; }); });
+
+  const items = all.filter(x => x.eff.done && (!mKey || monthKey(x.eff.date) === mKey));
+  if (items.length === 0) { alert("Aucune séance marquée comme réalisée pour cette période."); return; }
+  items.sort((a, b) => cmpDateTime({ date: a.eff.date, time: a.s.time }, { date: b.eff.date, time: b.s.time }));
+
+  const rows = [["Date", "Jour", "Horaire", "Ecole", "Classe", "Intervenant", "Semaine / cycle", "Seance n°", "Reportee depuis", "Compte-rendu"]];
+  items.forEach(x => {
+    const st = CLASSSTATS[classKey(x.s)];
+    const d = new Date(x.eff.date + "T00:00:00");
+    rows.push([
+      formatDateNum(x.eff.date), JOURS_FR[d.getDay()], x.s.time, x.s.school, x.s.classe, intLabel(x.s.int),
+      weekLabel(x.s), rank[x.s.id] + "/" + st.shown, x.eff.newDate ? formatDateNum(x.s.originalDate) : "", x.eff.note
+    ]);
+  });
+  const csv = rows.map(r => r.map(csvEscape).join(";")).join("\r\n");
+  const fname = mKey ? "seances-realisees-" + mKey + ".csv" : "seances-realisees-annee-" + todayISO() + ".csv";
+  downloadFile(fname, "\ufeff" + csv, "text/csv;charset=utf-8");
+}
+
+function exportAll() {
+  const data = { format: "suivi-echecs-v1", exportedAt: new Date().toISOString(), planning: planning, overrides: overrides };
+  downloadFile("sauvegarde-echecs-" + todayISO() + ".json", JSON.stringify(data, null, 2), "application/json");
+}
+
+async function importFile(file) {
+  let obj;
+  try { obj = JSON.parse(await file.text()); }
+  catch (e) { state.msg = "Fichier illisible (JSON invalide)."; render(); return; }
+  const hasPlanning = obj && obj.planning && typeof obj.planning === "object";
+  const hasOv = obj && obj.overrides && typeof obj.overrides === "object";
+  if (!hasPlanning && !hasOv) { state.msg = "Ce fichier ne contient ni planning ni séances enregistrées."; render(); return; }
+  const parts = [];
+  if (hasPlanning) parts.push("remplacer le planning");
+  if (hasOv) parts.push("importer " + Object.keys(obj.overrides).length + " séance(s) enregistrée(s)");
+  if (!confirm("Vous allez " + parts.join(" et ") + ". Continuer ?")) return;
+  try {
+    if (hasPlanning) await setDoc(doc(db, "config", "planning"), obj.planning);
+    if (hasOv) {
+      const ids = Object.keys(obj.overrides);
+      for (let i = 0; i < ids.length; i += 400) {
+        const batch = writeBatch(db);
+        ids.slice(i, i + 400).forEach(id => batch.set(doc(db, "overrides", id), obj.overrides[id], { merge: true }));
+        await batch.commit();
+      }
+    }
+    state.msg = "Import terminé ✔";
+  } catch (e) {
+    state.msg = "Échec de l'import : " + (e.code || e.message);
+  }
+  render();
+}
+
+/* =====================================================================
+   7) AFFICHAGE
+   ===================================================================== */
+function captureFocus() {
+  const a = document.activeElement;
+  if (a && a.id && app.contains(a) && (a.tagName === "TEXTAREA" || a.tagName === "INPUT"))
+    return { id: a.id, value: a.value, s: a.selectionStart, e: a.selectionEnd };
+  return null;
+}
+function restoreFocus(f) {
+  if (!f) return;
+  const el = document.getElementById(f.id);
+  if (!el) return;
+  el.value = f.value; el.focus();
+  try { el.setSelectionRange(f.s, f.e); } catch (_) { /* champ date */ }
+}
+
+function render() {
+  if (!configOk()) { renderNotConfigured(); return; }
+  if (!authReady) { app.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  if (!state.user) { renderLogin(); return; }
+  const focus = captureFocus();
+  computeClassStats();
+  let html = renderHeader() + renderTabs();
+  if (state.tab === "reglages") html += renderSettings();
+  else if (!planningLoaded) html += '<div class="empty-state">Chargement du planning…</div>';
+  else if (!planning) html += renderNoPlanning();
+  else if (state.tab === "avenir") html += renderAvenir();
+  else if (state.tab === "mois") html += renderParMois();
+  else if (state.tab === "stats") html += renderStats();
+  html += renderSyncStatus();
+  app.innerHTML = html;
+  restoreFocus(focus);
+}
+
+function renderNotConfigured() {
+  app.innerHTML = '<div class="box"><h1>Configuration manquante</h1>' +
+    '<p>Ouvrez le fichier <b>index.html</b> et remplacez les valeurs <b>COLLER_ICI</b> de la section <b>firebaseConfig</b> par celles de votre projet Firebase (voir le guide d&#39;installation).</p></div>';
+}
+
+function renderLogin() {
+  app.innerHTML =
+    '<div class="login-wrap"><div class="login-card">' +
+      '<div class="icon">♟️</div><h1>Suivi Interventions Échecs</h1><p class="muted">Connexion</p>' +
+      '<select id="login-user">' +
+        '<option value="alexandre"' + (state.loginUser === "alexandre" ? " selected" : "") + '>Alexandre</option>' +
+        '<option value="stephane"' + (state.loginUser === "stephane" ? " selected" : "") + '>Stéphane</option>' +
+      '</select>' +
+      '<input id="login-pass" type="password" placeholder="Mot de passe" autocomplete="current-password">' +
+      '<button data-action="login">Se connecter</button>' +
+      '<div class="login-error">' + esc(state.loginError) + '</div>' +
+    '</div></div>';
+}
+
+function renderHeader() {
+  return '<header class="topbar"><div><span class="badge-user ' + state.user + '">' + intLabel(state.user) + '</span></div>' +
+    '<button class="link" data-action="logout">Se déconnecter</button></header>';
+}
+
+function renderTabs() {
+  const tab = (k, l) => '<button data-action="tab" data-tab="' + k + '" class="' + (state.tab === k ? "active" : "") + '">' + l + '</button>';
+  let html = '<nav class="tabs">' + tab("avenir", "À venir") + tab("mois", "Par mois") + tab("stats", "Statistiques") + tab("reglages", "Réglages") + '</nav>';
+  if (state.tab !== "reglages") {
+    html += '<div class="toolbar"><div class="toggle-group">' +
+      '<button data-action="scope" data-scope="mine" class="' + (state.scopeMine ? "active" : "") + '">Mes séances</button>' +
+      '<button data-action="scope" data-scope="all" class="' + (!state.scopeMine ? "active" : "") + '">Toutes</button></div></div>';
+  }
+  return html;
+}
+
+function scoped(list) { return state.scopeMine ? list.filter(x => x.s.int === state.user) : list; }
+
+function groupAndRender(items) {
+  let html = "", last = null;
+  items.forEach(x => {
+    if (x.eff.date !== last) { html += '<div class="day-title">' + formatDateLong(x.eff.date) + '</div>'; last = x.eff.date; }
+    html += renderSessionCard(x.s, x.eff);
+  });
+  return html;
+}
+function withEff() { return SESSIONS.map(s => ({ s, eff: effective(s) })); }
+function sortItems(items) { return items.sort((a, b) => cmpDateTime({ date: a.eff.date, time: a.s.time }, { date: b.eff.date, time: b.s.time })); }
+
+function renderAvenir() {
+  const today = todayISO();
+  const items = sortItems(scoped(withEff().filter(x => x.eff.date >= today))).slice(0, 40);
+  return items.length ? groupAndRender(items) : '<div class="empty-state">Aucune séance à venir.</div>';
+}
+
+function renderParMois() {
+  const set = {}; withEff().forEach(x => { set[monthKey(x.eff.date)] = true; });
+  const months = Object.keys(set).sort();
+  if (!months.length) return '<div class="empty-state">Aucune séance.</div>';
+  if (!state.selectedMonth || months.indexOf(state.selectedMonth) === -1) {
+    const cur = monthKey(todayISO());
+    state.selectedMonth = months.indexOf(cur) !== -1 ? cur : (cur > months[months.length - 1] ? months[months.length - 1] : months[0]);
+  }
+  const options = months.map(k => '<option value="' + k + '"' + (k === state.selectedMonth ? " selected" : "") + '>' + monthLabel(k) + '</option>').join("");
+  let html = '<div class="toolbar"><select id="month-select">' + options + '</select>' +
+    '<button data-action="export-month">📄 Exporter les séances réalisées (CSV)</button></div>';
+  const items = sortItems(scoped(withEff().filter(x => monthKey(x.eff.date) === state.selectedMonth)));
+  const nbFeries = items.filter(x => holidays()[x.eff.date]).length;
+  if (nbFeries) html += '<div class="holiday-note">⚠️ ' + nbFeries + ' séance(s) tombent un jour férié ou sans classe ce mois-ci : à reporter.</div>';
+  html += items.length ? groupAndRender(items) : '<div class="empty-state">Aucune séance ce mois-ci.</div>';
+  return html;
+}
+
+function renderSessionCard(s, eff) {
+  const st = CLASSSTATS[classKey(s)];
+  const hol = holidays()[eff.date];
+  let h = '<div class="session-card' + (eff.done ? " done" : "") + (eff.newDate ? " reported" : "") + '">';
+  h += '<div class="session-top">' +
+    '<input type="checkbox" class="session-check" data-action="toggle-done" data-id="' + s.id + '"' + (eff.done ? " checked" : "") + '>' +
+    '<div class="session-info">' +
+      '<div class="time">' + esc(s.time) + '</div>' +
+      '<div class="school">' + esc(s.school) + '</div>' +
+      '<div class="classe">' + esc(s.classe) + '</div>' +
+      '<div class="session-meta">' +
+        '<span class="pill ' + weekClass(s) + '">' + esc(weekLabel(s)) + '</span>' +
+        '<span class="pill intervenant ' + s.int + '">' + intLabel(s.int) + '</span>' +
+        '<span class="pill count">✔ ' + st.done + '/' + st.shown + ' séances faites</span>' +
+      '</div>';
+  if (eff.newDate) h += '<div class="reported-note">Reportée depuis le ' + formatDateShort(s.originalDate) + ' → nouvelle date : ' + formatDateShort(eff.newDate) + '</div>';
+  if (hol) h += '<div class="holiday-note">🚫 ' + esc(hol) + ' &mdash; pas d&#39;école ce jour-là : pensez à reporter la séance</div>';
+  if (eff.note && state.openNote !== s.id) h += '<div class="note-preview">📝 ' + esc(eff.note) + '</div>';
+  h += '</div></div>';
+
+  h += '<div class="session-actions">' +
+    '<button data-action="toggle-report" data-id="' + s.id + '">' + (eff.newDate ? "Modifier le report" : "Reporter") + '</button>' +
+    (eff.newDate ? '<button class="danger" data-action="cancel-report" data-id="' + s.id + '">Annuler le report</button>' : "") +
+    '<button data-action="toggle-note" data-id="' + s.id + '">' + (eff.note ? "Modifier la note" : "Ajouter une note") + '</button></div>';
+
+  if (state.openReport === s.id)
+    h += '<div class="inline-panel"><div class="row"><input type="date" id="report-date-' + s.id + '" value="' + (eff.newDate || s.originalDate) + '">' +
+         '<button class="btn" data-action="save-report" data-id="' + s.id + '">Valider</button></div></div>';
+  if (state.openNote === s.id)
+    h += '<div class="inline-panel"><textarea id="note-text-' + s.id + '" placeholder="Compte-rendu de la séance...">' + esc(eff.note) + '</textarea>' +
+         '<div class="row"><button class="btn" data-action="save-note" data-id="' + s.id + '">Enregistrer la note</button></div></div>';
+  return h + '</div>';
+}
+
+function renderStats() {
+  // --- par mois (les deux intervenants)
+  const months = {};
+  withEff().forEach(x => { months[monthKey(x.eff.date)] = months[monthKey(x.eff.date)] || { Alexandre: 0, Stephane: 0 }; });
+  withEff().forEach(x => { if (x.eff.done) months[monthKey(x.eff.date)][x.s.int]++; });
+  let tA = 0, tS = 0;
+  const rows = Object.keys(months).sort().map(k => {
+    const c = months[k]; tA += c.Alexandre; tS += c.Stephane;
+    return '<tr><td>' + monthLabel(k) + '</td><td class="num">' + c.Alexandre + '</td><td class="num">' + c.Stephane + '</td><td class="num">' + (c.Alexandre + c.Stephane) + '</td></tr>';
+  }).join("");
+  let html = '<h2>Séances réalisées par mois</h2>' +
+    '<table class="stats"><thead><tr><th>Mois</th><th>Alexandre</th><th>Stéphane</th><th>Total</th></tr></thead><tbody>' + rows +
+    '<tr class="total-row"><td>Total</td><td class="num">' + tA + '</td><td class="num">' + tS + '</td><td class="num">' + (tA + tS) + '</td></tr></tbody></table>';
+
+  // --- par classe
+  html += '<h2>Avancement par classe</h2>';
+  const list = Object.keys(CLASSSTATS).map(k => CLASSSTATS[k]).filter(c => !state.scopeMine || c.int === state.user);
+  list.sort((a, b) => a.school.localeCompare(b.school) || a.classe.localeCompare(b.classe));
+  let lastSchool = null;
+  list.forEach(c => {
+    if (c.school !== lastSchool) { html += '<div class="school-title">' + esc(c.school) + '</div>'; lastSchool = c.school; }
+    const pct = c.shown ? Math.min(100, Math.round(100 * c.done / c.shown)) : 0;
+    html += '<div class="class-row"><div class="name">' + esc(c.classe) + ' <span class="muted">· ' + intLabel(c.int) + '</span></div>' +
+      '<div class="bar"><span style="width:' + pct + '%"></span></div><div class="frac">' + c.done + '/' + c.shown + '</div></div>';
+  });
+  if (!list.length) html += '<div class="empty-state">Aucune classe.</div>';
+  return html;
+}
+
+function importBox() {
+  return '<div class="box"><b>Importer un fichier</b>' +
+    '<p class="muted">Planning de l&#39;année ou sauvegarde (fichier .json).</p>' +
+    '<button class="btn" data-action="import-click">📥 Choisir un fichier…</button>' +
+    '<input type="file" id="import-file" accept=".json,application/json" style="display:none">' +
+    (state.msg ? '<div class="msg">' + esc(state.msg) + '</div>' : '') + '</div>';
+}
+function renderNoPlanning() {
+  return '<div class="box"><h2 style="margin-top:0">Aucun planning chargé</h2>' +
+    '<p>Importez le fichier <b>planning-2026-2027.json</b> pour générer toutes les séances de l&#39;année.</p></div>' + importBox();
+}
+function renderSettings() {
+  const info = planning ? '<p class="muted">Planning chargé : année ' + esc(planning.annee || "?") + ' — ' + SESSIONS.length + ' séances.</p>' : '<p class="muted">Aucun planning chargé.</p>';
+  return '<div class="box"><b>Exports</b>' + info +
+    '<button class="btn" data-action="export-year">📄 Séances réalisées de l&#39;année (CSV)</button>' +
+    '<button class="btn" data-action="export-all">💾 Sauvegarde complète (JSON)</button>' +
+    '<p class="muted">L&#39;export d&#39;un mois se fait depuis l&#39;onglet « Par mois ». Pensez à faire une sauvegarde complète de temps en temps.</p></div>' + importBox();
+}
+
+function renderSyncStatus() {
+  if (syncError) return '<div class="sync-status err">⚠️ ' + esc(syncError) + '</div>';
+  if (pendingWrites) return '<div class="sync-status">⏳ Modifications en attente d&#39;envoi (connexion ?)</div>';
+  return '<div class="sync-status">✔ Données synchronisées entre Alexandre et Stéphane</div>';
+}
+
+/* =====================================================================
+   8) ÉVÉNEMENTS (délégation)
+   ===================================================================== */
+app.addEventListener("click", e => {
+  const el = e.target.closest("[data-action]");
+  if (!el) return;
+  const a = el.dataset.action, id = el.dataset.id;
+  switch (a) {
+    case "login": doLogin(); break;
+    case "logout": signOut(auth); break;
+    case "tab": state.tab = el.dataset.tab; state.openReport = null; state.openNote = null; state.msg = ""; render(); break;
+    case "scope": state.scopeMine = el.dataset.scope === "mine"; render(); break;
+    case "toggle-report": state.openReport = state.openReport === id ? null : id; state.openNote = null; render(); break;
+    case "toggle-note": state.openNote = state.openNote === id ? null : id; state.openReport = null; render(); break;
+    case "cancel-report": state.openReport = null; saveOverride(id, { newDate: null }); break;
+    case "save-report": {
+      const input = document.getElementById("report-date-" + id);
+      if (!input || !input.value) return;
+      const dd = new Date(input.value + "T00:00:00").getDay();
+      if (holidays()[input.value] && !confirm("Cette date est un jour férié (" + holidays()[input.value] + "). Confirmer quand même ?")) return;
+      if ((dd === 0 || dd === 6) && !confirm("Cette date tombe un week-end. Confirmer quand même ?")) return;
+      state.openReport = null; saveOverride(id, { newDate: input.value }); break;
+    }
+    case "save-note": {
+      const ta = document.getElementById("note-text-" + id);
+      state.openNote = null; saveOverride(id, { note: ta ? ta.value : "" }); break;
+    }
+    case "export-month": exportDoneCSV(state.selectedMonth); break;
+    case "export-year": exportDoneCSV(null); break;
+    case "export-all": exportAll(); break;
+    case "import-click": { const f = document.getElementById("import-file"); if (f) f.click(); break; }
+  }
+});
+
+app.addEventListener("change", e => {
+  const t = e.target;
+  if (t.matches('[data-action="toggle-done"]')) saveOverride(t.dataset.id, { done: t.checked });
+  else if (t.id === "month-select") { state.selectedMonth = t.value; render(); }
+  else if (t.id === "import-file" && t.files && t.files[0]) { const f = t.files[0]; t.value = ""; importFile(f); }
+});
+
+app.addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.id === "login-pass") doLogin();
+});
+
+/* =====================================================================
+   9) DÉMARRAGE
+   ===================================================================== */
+if (configOk()) initFirebase();
+render();
+</script>
+</body>
+</html>
