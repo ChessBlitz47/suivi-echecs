@@ -216,29 +216,45 @@ const state = {
 /* =====================================================================
    4) GÉNÉRATION DES SÉANCES À PARTIR DU PLANNING
    ===================================================================== */
+// Un planning peut contenir plusieurs "versions" : chacune s'applique à partir d'une date (depuis).
+// Les séances antérieures à cette date restent générées avec la version précédente,
+// ce qui préserve leurs cases cochées et leurs notes.
+function planningVersions(p) {
+  if (Array.isArray(p.versions) && p.versions.length)
+    return p.versions.slice().sort((a, b) => a.depuis < b.depuis ? -1 : a.depuis > b.depuis ? 1 : 0);
+  return [{ depuis: "0000-00-00", semaineA: p.semaineA, semaineB: p.semaineB, cycles: p.cycles }];
+}
+
 function buildSessions(p) {
   const list = [];
-  function gen(mondays, tpl, week, cycleName) {
-    (mondays || []).forEach(monday => {
-      (tpl || []).forEach(slot => {
-        const off = DAY_OFFSET[slot.day];
-        if (off === undefined) return;
-        const date = addDays(monday, off);
-        const id = [slugify(slot.int), slugify(slot.day), slugify(slot.time), slugify(slot.school), slugify(slot.classe), date].join("-");
-        list.push({
-          id, int: slot.int, day: slot.day, time: slot.time, school: slot.school, classe: slot.classe,
-          week, cycle: cycleName || null, total: slot.total || null, originalDate: date
+  const versions = planningVersions(p);
+  // Semaines d'école (toutes les semaines A et B), utilisées pour les cycles consécutifs
+  const schoolWeeks = (p.lundisSemaineA || []).concat(p.lundisSemaineB || []).sort();
+  versions.forEach((v, i) => {
+    const from = v.depuis || "0000-00-00";
+    const to = i + 1 < versions.length ? versions[i + 1].depuis : "9999-99-99";
+    function gen(mondays, tpl, week, cycleName) {
+      (mondays || []).forEach(monday => {
+        (tpl || []).forEach(slot => {
+          const off = DAY_OFFSET[slot.day];
+          if (off === undefined) return;
+          const date = addDays(monday, off);
+          if (date < from || date >= to) return;
+          const id = [slugify(slot.int), slugify(slot.day), slugify(slot.time), slugify(slot.school), slugify(slot.classe), date].join("-");
+          list.push({
+            id, int: slot.int, day: slot.day, time: slot.time, school: slot.school, classe: slot.classe,
+            week, cycle: cycleName || null, total: slot.total || null, originalDate: date
+          });
         });
       });
+    }
+    gen(p.lundisSemaineA, v.semaineA, "A");
+    gen(p.lundisSemaineB, v.semaineB, "B");
+    // Cycles (ex. Reclus) : N semaines d'école consécutives, hors vacances, sans alternance A/B
+    (v.cycles || []).forEach(c => {
+      const weeks = schoolWeeks.filter(m => m >= c.premierLundi).slice(0, c.nombre);
+      gen(weeks, c.creneaux, "C", c.nom);
     });
-  }
-  gen(p.lundisSemaineA, p.semaineA, "A");
-  gen(p.lundisSemaineB, p.semaineB, "B");
-  // Cycles (ex. Reclus) : N semaines d'école consécutives, hors vacances, sans alternance A/B
-  const schoolWeeks = (p.lundisSemaineA || []).concat(p.lundisSemaineB || []).sort();
-  (p.cycles || []).forEach(c => {
-    const weeks = schoolWeeks.filter(m => m >= c.premierLundi).slice(0, c.nombre);
-    gen(weeks, c.creneaux, "C", c.nom);
   });
   list.sort((a, b) => a.originalDate < b.originalDate ? -1 : a.originalDate > b.originalDate ? 1 : a.time.localeCompare(b.time));
   return list;
@@ -342,6 +358,58 @@ function saveOverride(id, patch) {
 }
 
 /* =====================================================================
+   5 bis) DONNÉES NON RATTACHÉES (créneau modifié après coup)
+   ===================================================================== */
+function parseId(id) {
+  const m = /^([a-z]+)-([a-z]+)-(\d{2}h\d{2})-(.+)-(\d{4}-\d{2}-\d{2})$/.exec(id);
+  return m ? { int: m[1], day: m[2], time: m[3], rest: m[4], date: m[5] } : null;
+}
+function hasData(o) { return !!(o && (o.done || (o.note && String(o.note).trim()) || o.newDate)); }
+function computeOrphans() {
+  if (!planning) return [];
+  const ids = new Set(SESSIONS.map(s => s.id));
+  return Object.keys(overrides).filter(id => !ids.has(id) && !overrides[id].rattacheA && hasData(overrides[id])).sort();
+}
+// Rattachement automatique : même intervenant, même jour, même horaire, même école, même date.
+function planReattach() {
+  const moves = [], conflicts = [], unmatched = [];
+  computeOrphans().forEach(id => {
+    const p = parseId(id);
+    if (!p) { unmatched.push(id); return; }
+    const cands = SESSIONS.filter(s => slugify(s.int) === p.int && slugify(s.day) === p.day && slugify(s.time) === p.time &&
+      s.originalDate === p.date && p.rest.indexOf(slugify(s.school) + "-") === 0);
+    if (cands.length !== 1) { unmatched.push(id); return; }
+    if (hasData(overrides[cands[0].id])) { conflicts.push({ from: id, to: cands[0].id }); return; }
+    moves.push({ from: id, to: cands[0].id });
+  });
+  return { moves, conflicts, unmatched };
+}
+function describeOrphan(id) {
+  const p = parseId(id), o = overrides[id] || {};
+  const head = p ? formatDateNum(p.date) + " · " + p.day + " " + p.time + " · " + p.rest : id;
+  return head + (o.done ? " ✔ faite" : "") + (o.note ? " — « " + String(o.note).slice(0, 60) + " »" : "");
+}
+async function applyReattach() {
+  const plan = planReattach();
+  if (!plan.moves.length) { state.msg = "Rien à rattacher automatiquement."; render(); return; }
+  if (!confirm("Rattacher " + plan.moves.length + " séance(s) cochée(s) ou note(s) au nouveau créneau (même jour, même horaire, même école) ?")) return;
+  try {
+    for (let i = 0; i < plan.moves.length; i += 200) {
+      const batch = writeBatch(db);
+      plan.moves.slice(i, i + 200).forEach(m => {
+        const o = overrides[m.from];
+        batch.set(doc(db, "overrides", m.to), { done: !!o.done, note: o.note || "", newDate: o.newDate || null,
+          updatedAt: Date.now(), updatedBy: state.user, rattacheDepuis: m.from }, { merge: true });
+        batch.set(doc(db, "overrides", m.from), { rattacheA: m.to }, { merge: true });
+      });
+      await batch.commit();
+    }
+    state.msg = plan.moves.length + " séance(s) rattachée(s) ✔";
+  } catch (e) { state.msg = "Échec du rattachement : " + (e.code || e.message); }
+  render();
+}
+
+/* =====================================================================
    6) EXPORT / IMPORT
    ===================================================================== */
 function downloadFile(filename, content, mime) {
@@ -441,6 +509,10 @@ function render() {
   const focus = captureFocus();
   computeClassStats();
   let html = renderHeader() + renderTabs();
+  if (planning && state.tab !== "reglages") {
+    const nOrph = computeOrphans().length;
+    if (nOrph) html += '<div class="holiday-note">⚠️ ' + nOrph + ' séance(s) cochée(s) ou note(s) ne correspondent plus au planning : voir Réglages.</div>';
+  }
   if (state.tab === "reglages") html += renderSettings();
   else if (!planningLoaded) html += '<div class="empty-state">Chargement du planning…</div>';
   else if (!planning) html += renderNoPlanning();
@@ -598,12 +670,33 @@ function renderNoPlanning() {
   return '<div class="box"><h2 style="margin-top:0">Aucun planning chargé</h2>' +
     '<p>Importez le fichier <b>planning-2026-2027.json</b> pour générer toutes les séances de l&#39;année.</p></div>' + importBox();
 }
+function renderOrphans() {
+  if (!planning) return "";
+  const plan = planReattach();
+  if (!plan.moves.length && !plan.conflicts.length && !plan.unmatched.length) return "";
+  const li = ids => '<ul style="margin:6px 0;padding-left:18px;font-size:0.8rem">' + ids.map(i => '<li>' + esc(describeOrphan(i)) + '</li>').join("") + '</ul>';
+  let h = '<div class="box"><b>⚠️ Données non rattachées au planning</b>' +
+    '<p class="muted">Ces séances cochées ou ces notes correspondaient à un créneau modifié depuis. Elles ne sont pas perdues.</p>';
+  if (plan.moves.length)
+    h += '<p><b>' + plan.moves.length + '</b> peuvent être rattachée(s) automatiquement (même jour, horaire et école) :</p>' + li(plan.moves.map(m => m.from)) +
+         '<button class="btn" data-action="reattach">🔗 Rattacher automatiquement</button>';
+  if (plan.conflicts.length)
+    h += '<p><b>' + plan.conflicts.length + '</b> en conflit (la nouvelle séance a déjà ses propres données) :</p>' + li(plan.conflicts.map(m => m.from));
+  if (plan.unmatched.length)
+    h += '<p><b>' + plan.unmatched.length + '</b> sans créneau équivalent dans le nouveau planning :</p>' + li(plan.unmatched) +
+         '<p class="muted">Envoyez-moi une sauvegarde complète si vous voulez que je les rattache à la main.</p>';
+  return h + '</div>';
+}
 function renderSettings() {
-  const info = planning ? '<p class="muted">Planning chargé : année ' + esc(planning.annee || "?") + ' — ' + SESSIONS.length + ' séances.</p>' : '<p class="muted">Aucun planning chargé.</p>';
+  let info = planning ? '<p class="muted">Planning chargé : année ' + esc(planning.annee || "?") + ' — ' + SESSIONS.length + ' séances.</p>' : '<p class="muted">Aucun planning chargé.</p>';
+  if (planning && Array.isArray(planning.versions) && planning.versions.length > 1) {
+    info += '<p class="muted">Versions du planning : ' + planningVersions(planning).map((v, i) =>
+      i === 0 ? 'initiale' : 'à partir du ' + formatDateNum(v.depuis)).join(' · ') + '.</p>';
+  }
   return '<div class="box"><b>Exports</b>' + info +
     '<button class="btn" data-action="export-year">📄 Séances réalisées de l&#39;année (CSV)</button>' +
     '<button class="btn" data-action="export-all">💾 Sauvegarde complète (JSON)</button>' +
-    '<p class="muted">L&#39;export d&#39;un mois se fait depuis l&#39;onglet « Par mois ». Pensez à faire une sauvegarde complète de temps en temps.</p></div>' + importBox();
+    '<p class="muted">L&#39;export d&#39;un mois se fait depuis l&#39;onglet « Par mois ». Pensez à faire une sauvegarde complète de temps en temps.</p></div>' + renderOrphans() + importBox();
 }
 
 function renderSyncStatus() {
@@ -642,6 +735,7 @@ app.addEventListener("click", e => {
     case "export-month": exportDoneCSV(state.selectedMonth); break;
     case "export-year": exportDoneCSV(null); break;
     case "export-all": exportAll(); break;
+    case "reattach": applyReattach(); break;
     case "import-click": { const f = document.getElementById("import-file"); if (f) f.click(); break; }
   }
 });
